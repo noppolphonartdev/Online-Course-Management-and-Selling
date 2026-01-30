@@ -73,7 +73,7 @@ function AppRouter() {
             element={<Navigate to="/admin/dashboard" replace />}
           />
 
-          {/* ปกป้องหน้าแอดมินทุกหน้า */}
+          {/* ป้องกันเข้าหน้าแอดมินทุกหน้า */}
           <Route
             path="/admin/dashboard"
             element={
