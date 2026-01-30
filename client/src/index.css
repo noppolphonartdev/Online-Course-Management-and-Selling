@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@media print {
+  /* ซ่อนทุกอย่างก่อน */
+  body * {
+    visibility: hidden;
+  }
+
+  /* ให้เห็นเฉพาะกล่องใบเซอร์ */
+  #certificate-print,
+  #certificate-print * {
+    visibility: visible;
+  }
+
+  /* จัดให้กล่องใบเซอร์กินทั้งหน้ากระดาษ */
+  #certificate-print {
+    position: absolute;
+    inset: 0; /* top:0; right:0; bottom:0; left:0; */
+    margin: 0 auto;
+  }
+}
