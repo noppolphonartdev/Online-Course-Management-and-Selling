@@ -26,6 +26,7 @@ import CertificatePage from "./pages/user/CertificatePage";
 import AdminCourses from "./pages/admin/AdminCourses";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminLogin from "./pages/admin/AdminLogin";
+import AdminMembers from "./pages/admin/AdminMembers";
 
 // components
 import Navbar from "./components/Navbar";
@@ -89,6 +90,16 @@ function AppRouter() {
             element={
               isAdminLoggedIn() ? (
                 <AdminCourses />
+              ) : (
+                <Navigate to="/admin/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/admin/members"
+            element={
+              isAdminLoggedIn() ? (
+                <AdminMembers />
               ) : (
                 <Navigate to="/admin/login" replace />
               )
