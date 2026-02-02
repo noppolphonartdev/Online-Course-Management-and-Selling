@@ -101,11 +101,17 @@ function AppRouter() {
             element={
               isAdminLoggedIn() ? (
                 <AdminMembers />
+              ) : (
+                <Navigate to="/admin/login" replace />
+              )
+            }
+          />
+          <Route
             path="/admin/orders"
             element={
               isAdminLoggedIn() ? (
                 <AdminOrders />
-              ) : (
+                ) : (
                 <Navigate to="/admin/login" replace />
               )
             }
