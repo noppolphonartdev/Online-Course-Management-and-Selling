@@ -44,6 +44,15 @@ const CheckIcon = () => (
   </svg>
 );
 
+const shuffleArray = (items) => {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
 function CourseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -217,10 +226,12 @@ function CourseDetail() {
   /* Quiz controls */
   const startQuiz = (title, items, type) => {
     if (!items?.length) return;
+    const quizItems =
+      type === "post" ? shuffleArray(items) : Array.isArray(items) ? items : [];
     setQuiz({
       open: true,
       title,
-      items,
+      items: quizItems,
       type,
       answers: {},
       showResult: false,
