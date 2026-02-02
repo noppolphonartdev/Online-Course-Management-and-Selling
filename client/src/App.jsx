@@ -26,6 +26,7 @@ import CertificatePage from "./pages/user/CertificatePage";
 import AdminCourses from "./pages/admin/AdminCourses";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminLogin from "./pages/admin/AdminLogin";
+import AdminMembers from "./pages/admin/AdminMembers";
 import AdminOrders from "./pages/admin/AdminOrders";
 
 // components
@@ -96,6 +97,10 @@ function AppRouter() {
             }
           />
           <Route
+            path="/admin/members"
+            element={
+              isAdminLoggedIn() ? (
+                <AdminMembers />
             path="/admin/orders"
             element={
               isAdminLoggedIn() ? (

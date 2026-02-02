@@ -48,6 +48,7 @@ export default function AdminSidebar({ sideOpen, setSideOpen }) {
 
       <nav className="px-3 space-y-1">
         <SidebarLink to="/admin/dashboard" label="Dashboard" />
+        <SidebarLink to="/admin/members" label="Member" />
         <SidebarLink to="/admin/orders" label="Order" />
         <SidebarLink to="/admin/courses" label="Manage Courses" />
       </nav>
