@@ -25,7 +25,7 @@ const courseQuizSchema = new mongoose.Schema(
     preTest: { type: [QuestionSchema], default: [] },
     postTest: { type: [QuestionSchema], default: [] },
 
-    passingScorePercent: { type: Number, default: 80 },
+    passingScorePercent: { type: Number, default: 70 },
     requirePreTest: { type: Boolean, default: true },
   },
 

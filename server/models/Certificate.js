@@ -33,7 +33,7 @@ const certificateSchema = new Schema(
     postTestTotal: { type: Number, default: 0 },
 
     // เงื่อนไขผ่าน ณ ขณะนั้น (เก็บเผื่อเปลี่ยนเกณฑ์ในอนาคต)
-    passingScorePercent: { type: Number, default: 80 },
+    passingScorePercent: { type: Number, default: 70 },
 
     issuedAt: { type: Date, default: Date.now },
   },

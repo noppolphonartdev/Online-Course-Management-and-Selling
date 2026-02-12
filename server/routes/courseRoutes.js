@@ -1,3 +1,4 @@
+// routes/courseRoutes.js
 const express = require("express");
 const router = express.Router();
 
@@ -14,7 +15,6 @@ const Certificate = require("../models/Certificate");
 // =======================
 
 // GET /api/courses  => ดึงคอร์สทั้งหมด
-// (ใน Course document มี curriculum ฝังอยู่แล้ว ตาม schema)
 router.get("/", async (req, res) => {
   try {
     const courses = await Course.find();
@@ -28,14 +28,10 @@ router.get("/", async (req, res) => {
 // => ดึงคอร์สตัวเดียว + preTest / postTest จาก CourseQuiz มาติดให้ด้วย
 router.get("/:id", async (req, res) => {
   try {
-    // ใช้ lean() เพื่อจะได้แก้ไข object เพิ่ม field ได้ง่าย
     const course = await Course.findById(req.params.id).lean();
     if (!course) return res.status(404).json({ error: "Course not found" });
 
-    // ดึงข้อสอบจาก CourseQuiz โดยผูกจาก course._id
     const quizDoc = await CourseQuiz.findOne({ courseId: course._id }).lean();
-
-    // เติม preTest / postTest เข้าไปใน object ที่จะส่งออก
     course.preTest = quizDoc?.preTest || [];
     course.postTest = quizDoc?.postTest || [];
 
@@ -49,18 +45,14 @@ router.get("/:id", async (req, res) => {
 // ADMIN ROUTES
 // =======================
 
-// POST /api/courses
-// => สร้างคอร์สใหม่ + สร้าง/อัปเดตชุดข้อสอบ (CourseQuiz)
+// POST /api/courses => สร้างคอร์ส + upsert ข้อสอบ CourseQuiz
 router.post("/", verifyToken, isAdmin, async (req, res) => {
   try {
-    // แยก field ที่เป็นข้อสอบออกมา ไม่ให้ไปลงใน Course โดยตรง
     const { preTest, postTest, ...courseData } = req.body;
 
-    // 1) สร้าง Course (จะมี curriculum อยู่ในตัว courseData แล้ว)
     const newCourse = new Course(courseData);
     const savedCourse = await newCourse.save();
 
-    // 2) ถ้ามีส่ง preTest / postTest มาด้วย ให้ upsert เข้า CourseQuiz
     if (
       (Array.isArray(preTest) && preTest.length > 0) ||
       (Array.isArray(postTest) && postTest.length > 0)
@@ -83,13 +75,11 @@ router.post("/", verifyToken, isAdmin, async (req, res) => {
   }
 });
 
-// PUT /api/courses/:id
-// => แก้ไขคอร์ส + แก้ไขชุดข้อสอบ
+// PUT /api/courses/:id => แก้คอร์ส + แก้ข้อสอบ CourseQuiz
 router.put("/:id", verifyToken, isAdmin, async (req, res) => {
   try {
     const { preTest, postTest, ...courseData } = req.body;
 
-    // 1) อัปเดตข้อมูลคอร์ส (รวม curriculum ที่อยู่ใน courseData)
     const updatedCourse = await Course.findByIdAndUpdate(
       req.params.id,
       courseData,
@@ -100,7 +90,6 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
       return res.status(404).json({ error: "Course not found" });
     }
 
-    // 2) อัปเดตชุดข้อสอบ (ถ้ามี field preTest / postTest ส่งมา)
     const quizUpdate = { courseId: req.params.id };
     let shouldUpdateQuiz = false;
 
@@ -128,8 +117,7 @@ router.put("/:id", verifyToken, isAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/courses/:id
-// => ลบคอร์ส + ลบชุดข้อสอบที่ผูกกับคอร์สนั้น
+// DELETE /api/courses/:id => ลบคอร์ส + ลบชุดข้อสอบ
 router.delete("/:id", verifyToken, isAdmin, async (req, res) => {
   try {
     const deletedCourse = await Course.findByIdAndDelete(req.params.id);
@@ -137,9 +125,7 @@ router.delete("/:id", verifyToken, isAdmin, async (req, res) => {
       return res.status(404).json({ error: "Course not found" });
     }
 
-    // ลบชุดข้อสอบที่ผูกกับคอร์สนี้ด้วย
     await CourseQuiz.findOneAndDelete({ courseId: req.params.id });
-
     res.status(200).json({ message: "คอร์สถูกลบแล้ว" });
   } catch (err) {
     console.error("Delete course error:", err);
@@ -195,7 +181,8 @@ router.get("/:id/quiz/status", verifyToken, async (req, res) => {
 // =======================
 // SUBMIT QUIZ (pre / post)
 // POST /api/courses/:id/quiz/:type
-// body: { answers: [Number, ...] }
+// body (แนะนำ): { answers: [{questionId, answerIndex}, ...] }
+// รองรับของเก่า: { answers: [Number, ...] }
 // =======================
 router.post("/:id/quiz/:type", verifyToken, async (req, res) => {
   try {
@@ -209,16 +196,14 @@ router.post("/:id/quiz/:type", verifyToken, async (req, res) => {
     const course = await Course.findById(req.params.id);
     if (!course) return res.status(404).json({ message: "Course not found" });
 
-    // ดึงคำถาม + config quiz จาก CourseQuiz
     const quizConfig = await CourseQuiz.findOne({ courseId: course._id });
     if (!quizConfig) {
-      return res
-        .status(400)
-        .json({ message: "no quiz config for this course" });
+      return res.status(400).json({ message: "no quiz config for this course" });
     }
 
     const questions =
       type === "pre" ? quizConfig.preTest || [] : quizConfig.postTest || [];
+
     const total = questions.length;
     if (!total) return res.status(400).json({ message: "no questions" });
 
@@ -237,11 +222,11 @@ router.post("/:id/quiz/:type", verifyToken, async (req, res) => {
       }
     }
 
-    // ใช้ passingScorePercent จาก CourseQuiz (default = 80%)
+    // passingScorePercent จาก CourseQuiz (default = 80%)
     const passingPercent =
       typeof quizConfig.passingScorePercent === "number"
         ? quizConfig.passingScorePercent
-        : 80;
+        : 70;
 
     const passThreshold = Math.ceil((passingPercent / 100) * total);
 
@@ -252,7 +237,6 @@ router.post("/:id/quiz/:type", verifyToken, async (req, res) => {
       type,
     });
 
-    // ====== กติกาเดิม ======
     if (type === "pre") {
       // preTest ทำได้ครั้งเดียว
       if (record && record.attemptCount >= 1) {
@@ -261,17 +245,45 @@ router.post("/:id/quiz/:type", verifyToken, async (req, res) => {
     } else {
       // postTest ทำได้หลายครั้งจนกว่าจะ "ผ่าน"
       if (record && record.passed) {
-        return res
-          .status(400)
-          .json({ message: "postTest ผ่านแล้ว ไม่สามารถทำซ้ำ" });
+        return res.status(400).json({ message: "postTest ผ่านแล้ว ไม่สามารถทำซ้ำ" });
       }
     }
 
-    // คำนวณคะแนน
+    // =========================
+    // ตรวจคำตอบด้วย questionId (รองรับการ shuffle)
+    // - ถ้า answers เป็น object array -> map ตาม questionId
+    // - ถ้า answers เป็น number array -> fallback ตรวจตาม index แบบเดิม
+    // =========================
     let score = 0;
-    questions.forEach((q, i) => {
-      if (Number(answers[i]) === Number(q.correctIndex)) score++;
-    });
+
+    const isObjectPayload =
+      Array.isArray(answers) &&
+      answers.length > 0 &&
+      typeof answers[0] === "object" &&
+      answers[0] !== null;
+
+    if (isObjectPayload) {
+      // สร้าง map: questionId -> answerIndex
+      const ansMap = new Map();
+      for (const a of answers) {
+        const qid = a?.questionId;
+        const idx = typeof a?.answerIndex === "number" ? a.answerIndex : -1;
+        if (qid) ansMap.set(String(qid), idx);
+      }
+
+      // ตรวจทีละข้อด้วย _id ของข้อสอบใน DB
+      questions.forEach((q) => {
+        const userAns = ansMap.get(String(q._id));
+        if (typeof userAns === "number" && userAns === Number(q.correctIndex)) {
+          score++;
+        }
+      });
+    } else {
+      // fallback แบบเดิม (ไม่รองรับ shuffle)
+      questions.forEach((q, i) => {
+        if (Number(answers[i]) === Number(q.correctIndex)) score++;
+      });
+    }
 
     const passed = score >= passThreshold;
 
@@ -285,8 +297,8 @@ router.post("/:id/quiz/:type", verifyToken, async (req, res) => {
         bestScore: score,
         lastScore: score,
         total,
-        passed,
-        attempts: [{ score, total, answers }],
+        passed: type === "post" ? passed : false,
+        attempts: [{ score, total, answers }], // เก็บ payload ตามที่ส่งมา
       });
     } else {
       record.attemptCount += 1;
@@ -296,12 +308,13 @@ router.post("/:id/quiz/:type", verifyToken, async (req, res) => {
 
       if (type === "post" && passed) record.passed = true;
 
-      record.attempts.push({ score, total, answers });
+      record.attempts.push({ score, total, answers }); // เก็บ payload ตามที่ส่งมา
       await record.save();
     }
 
+    // ออก certificate เฉพาะ post และผ่าน
     let cert = null;
-    if (type === "post") {
+    if (type === "post" && passed) {
       cert = await issueCertificateIfEligible(req.user.id, course._id);
     }
 
@@ -322,20 +335,36 @@ router.post("/:id/quiz/:type", verifyToken, async (req, res) => {
   }
 });
 
+// =======================
 // ฟังก์ชันออก Certificate ถ้าเข้าเงื่อนไข
+// =======================
 async function issueCertificateIfEligible(userId, courseId) {
+  // 1) ต้องมี order paid ก่อน
+  const paidOrder = await Order.findOne({
+    userId,
+    courseId,
+    paymentStatus: "paid",
+  }).sort({ purchaseDate: 1 });
+
+  if (!paidOrder) return null;
+
+  // 2) ต้องมี pre + post และ post ผ่าน
   const pre = await QuizSubmission.findOne({ userId, courseId, type: "pre" });
   const post = await QuizSubmission.findOne({ userId, courseId, type: "post" });
-
   if (!pre || !post) return null;
   if (!post.passed) return null;
 
-  const quizConfig = await CourseQuiz.findById(courseId);
-  const passingPercent = quizConfig?.passingScorePercent || 80;
+  // 3) ดึง passingPercent จาก CourseQuiz ให้ถูกต้อง
+  const quizConfig = await CourseQuiz.findOne({ courseId }); // แก้จาก findById(courseId)
+  const passingPercent =
+    typeof quizConfig?.passingScorePercent === "number"
+      ? quizConfig.passingScorePercent
+      : 70;
 
   const postPercent = post.total > 0 ? (post.bestScore / post.total) * 100 : 0;
   if (postPercent < passingPercent) return null;
 
+  // 4) upsert certificate
   const code =
     "CERT-" +
     (courseId.toString().slice(-4) || "XXXX") +
@@ -345,10 +374,9 @@ async function issueCertificateIfEligible(userId, courseId) {
   const cert = await Certificate.findOneAndUpdate(
     { userId, courseId },
     {
-      $setOnInsert: {
-        certificateCode: code,
-      },
+      $setOnInsert: { certificateCode: code },
       $set: {
+        orderId: paidOrder._id,
         preTestScore: pre.lastScore || 0,
         preTestTotal: pre.total || 0,
         postTestScore: post.bestScore || 0,

@@ -64,32 +64,9 @@ function CourseDetail() {
   const [orders, setOrders] = useState([]); // ใช้ตรวจว่าซื้อแล้วหรือยัง
   const [certificate, setCertificate] = useState({ loading: true, data: null });
 
-  // โหลด certificate status
-  useEffect(() => {
-    if (!token || !id) {
-      setCertificate({ loading: false, data: null });
-      return;
-    }
-
-    axios
-      .get(`http://localhost:5000/api/certificates/${id}/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
-        if (res.data?.hasCertificate) {
-          setCertificate({ loading: false, data: res.data.certificate });
-        } else {
-          setCertificate({ loading: false, data: null });
-        }
-      })
-      .catch(() => setCertificate({ loading: false, data: null }));
-  }, [id, token]);
-
-  /* Accordion: เปิด/ปิดหัวข้อ */
   // โครงสร้างเป็น { [sectionIndex]: boolean }
   const [openSections, setOpenSections] = useState({});
 
-  /* Player Modal */
   // เก็บ index ของบทเรียนที่กำลังเล่นด้วย เพื่ออัปเดต progress ถูกตัว
   const [player, setPlayer] = useState({
     open: false,
@@ -169,6 +146,42 @@ function CourseDetail() {
       .then((res) => setQuizStatus(res.data || { pre: null, post: null }))
       .catch(() => setQuizStatus({ pre: null, post: null }));
   }, [id, token]);
+
+  useEffect(() => {
+  let alive = true;
+
+  const checkCert = async () => {
+    //  ยังไม่ผ่าน post-test ไม่ต้องเช็ค certificate เลย
+    if (!quizStatus?.post?.passed) {
+      setCertificate({ loading: false, data: null });
+      return;
+    }
+
+    setCertificate({ loading: true, data: null });
+
+    try {
+      const r = await axios.get(
+        `http://localhost:5000/api/certificates/${id}/me`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (!alive) return;
+
+      if (r.data?.hasCertificate) {
+        setCertificate({ loading: false, data: r.data.certificate });
+      } else {
+        setCertificate({ loading: false, data: null });
+      }
+    } catch (e) {
+      if (!alive) return;
+      // สำคัญ: error ก็ต้องปิด loading
+      setCertificate({ loading: false, data: null });
+    }
+  };
+
+  checkCert();
+  return () => { alive = false; };
+}, [id, token, quizStatus?.post?.passed]);
 
   /* เป็นเจ้าของคอร์สแล้วหรือยัง */
   const purchased = useMemo(() => {
@@ -251,26 +264,56 @@ function CourseDetail() {
     });
     document.body.style.overflow = "";
   };
+
   const submitQuiz = async () => {
     try {
-      const answersArr = quiz.items.map((_, i) =>
-        typeof quiz.answers[i] === "number" ? quiz.answers[i] : -1
-      );
+      // ส่งเป็น [{ questionId, answerIndex }] เพื่อรองรับการ shuffle
+      const answersPayload = quiz.items.map((q, i) => {
+        const qid = q?._id || q?.id; // subdocument ของ mongoose จะมี _id
+        if (!qid) {
+          throw new Error("ไม่พบ questionId (_id) ในข้อสอบ กรุณาเช็คโครงสร้างข้อมูลข้อสอบ");
+        }
+        return {
+          questionId: String(qid),
+          answerIndex: typeof quiz.answers[i] === "number" ? quiz.answers[i] : -1,
+        };
+      });
+
       const res = await axios.post(
         `http://localhost:5000/api/courses/${id}/quiz/${quiz.type}`,
-        { answers: answersArr },
+        { answers: answersPayload },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
       const { score } = res.data;
       setQuiz((prev) => ({ ...prev, showResult: true, score }));
 
+      // โหลดสถานะใหม่เหมือนเดิม
       const st = await axios.get(
         `http://localhost:5000/api/courses/${id}/quiz/status`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setQuizStatus(st.data || { pre: null, post: null });
+
+      // ตรวจ Certificate หลังทำ post-test
+      if (quiz.type === "post") {
+        setCertificate({ loading: true, data: null });
+        try {
+          const certRes = await axios.get(
+            `http://localhost:5000/api/certificates/${id}/me`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (certRes.data?.hasCertificate) {
+            setCertificate({ loading: false, data: certRes.data.certificate });
+          } else {
+            setCertificate({ loading: false, data: null });
+          }
+        } catch {
+          setCertificate({ loading: false, data: null });
+        }
+      }
     } catch (err) {
-      alert(err.response?.data?.message || "ส่งคำตอบไม่สำเร็จ");
+      alert(err.response?.data?.message || err.message || "ส่งคำตอบไม่สำเร็จ");
     }
   };
 
@@ -317,8 +360,8 @@ function CourseDetail() {
                   !course.preTest?.length
                     ? "ยังไม่มีข้อสอบ"
                     : quizStatus.pre?.attemptCount >= 1
-                    ? "ทำได้ครั้งเดียว"
-                    : ""
+                      ? "ทำได้ครั้งเดียว"
+                      : ""
                 }
               >
                 ทำแบบทดสอบก่อนเรียน
@@ -328,17 +371,16 @@ function CourseDetail() {
                 onClick={() =>
                   purchased
                     ? startQuiz(
-                        "แบบทดสอบหลังเรียน",
-                        course.postTest || [],
-                        "post"
-                      )
+                      "แบบทดสอบหลังเรียน",
+                      course.postTest || [],
+                      "post"
+                    )
                     : navigate(`/checkout/${course._id}`)
                 }
-                className={`rounded-lg px-4 py-2 ${
-                  purchased
+                className={`rounded-lg px-4 py-2 ${purchased
                     ? "border hover:bg-gray-50"
                     : "bg-indigo-600 text-white hover:bg-indigo-700"
-                } disabled:opacity-60`}
+                  } disabled:opacity-60`}
                 disabled={
                   purchased
                     ? !course.postTest?.length || quizStatus.post?.passed
@@ -349,8 +391,8 @@ function CourseDetail() {
                     ? !course.postTest?.length
                       ? "ยังไม่มีข้อสอบ"
                       : quizStatus.post?.passed
-                      ? "ผ่านแล้ว"
-                      : ""
+                        ? "ผ่านแล้ว"
+                        : ""
                     : "ต้องชำระเงินก่อน"
                 }
               >
@@ -595,11 +637,10 @@ function CourseDetail() {
                     {q.choices.map((c, ci) => (
                       <label
                         key={ci}
-                        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${
-                          quiz.showResult && ci === q.correctIndex
+                        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${quiz.showResult && ci === q.correctIndex
                             ? "border-emerald-400 bg-emerald-50"
                             : ""
-                        }`}
+                          }`}
                       >
                         <input
                           type="radio"

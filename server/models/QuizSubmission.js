@@ -1,4 +1,3 @@
-// models/QuizSubmission.js
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
@@ -6,7 +5,7 @@ const AttemptSchema = new Schema(
   {
     score: { type: Number, required: true },
     total: { type: Number, required: true },
-    answers: { type: [Number], default: [] }, // index ช้อยส์ที่ตอบ
+    answers: { type: [Schema.Types.Mixed], default: [] }, // index ช้อยส์ที่ตอบ
     createdAt: { type: Date, default: Date.now },
   },
   { _id: false }
