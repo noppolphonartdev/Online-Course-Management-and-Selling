@@ -29,6 +29,20 @@ const orderSchema = new mongoose.Schema({
     type: String,
   },
 
+  // --- สลิป/การตรวจสอบของแอดมิน ---
+  slipUrl: { type: String, default: "" }, // path รูปสลิป เช่น /uploads/xxx.jpg
+  slipUploadedAt: { type: Date, default: null },
+  slipNote: { type: String, default: "" }, // note จากผู้ใช้ (ไม่บังคับ)
+
+  reviewedBy: {
+    // เก็บ id ของผู้ที่อนุมัติ/ปฏิเสธ (อาจเป็น User ที่ role admin)
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  reviewedAt: { type: Date, default: null },
+  paidAt: { type: Date, default: null }, // เซ็ตเมื่ออนุมัติเป็น paid
+
   // --- ข้อมูลลูกค้า (เก็บไว้เพื่อความสะดวก) ---
   customerName: { type: String, required: true },
   customerEmail: { type: String, required: true },

@@ -1,52 +1,88 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useEffect, useState, useContext } from "react";
+import axios from "axios";
 
-// 1. สร้าง Context object
+// 1) สร้าง Context object
 const AuthContext = createContext(null);
 
-// Utility function สำหรับอ่านข้อมูลจาก localStorage
+// Utility: อ่าน user จาก localStorage
 const getUserFromLocalStorage = () => {
-    try {
-        // ดึงข้อมูล 'user' จาก localStorage แล้วแปลงกลับเป็น object
-        return JSON.parse(localStorage.getItem("user")) || null;
-    } catch {
-        return null;
-    }
+  try {
+    return JSON.parse(localStorage.getItem("user")) || null;
+  } catch {
+    return null;
+  }
 };
 
-// 2. สร้าง Provider Component (ตัวจัดการและส่งต่อ State)
 export const AuthProvider = ({ children }) => {
-    // สร้าง state 'user' โดยมีค่าเริ่มต้นจาก localStorage
-    const [user, setUser] = useState(() => getUserFromLocalStorage());
+  const [user, setUser] = useState(() => getUserFromLocalStorage());
 
-    const login = (loginResponseData) => {
-        // localStorage.removeItem('adminToken');
-        // บันทึกข้อมูล user และ token ลงใน localStorage
-        localStorage.setItem("user", JSON.stringify(loginResponseData));
-        localStorage.setItem("token", loginResponseData.token); // บันทึก token ด้วย
-        setUser(loginResponseData);
-    };
+  // แจ้งเตือน: จำนวน unread เพื่อโชว์ที่ Navbar
+  const [unreadNotiCount, setUnreadNotiCount] = useState(0);
 
-    const logout = () => {
+  const login = (loginResponseData) => {
+    localStorage.setItem("user", JSON.stringify(loginResponseData));
+    localStorage.setItem("token", loginResponseData.token);
+    setUser(loginResponseData);
+  };
+
+  const logout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     setUser(null);
+    setUnreadNotiCount(0);
+  };
+
+  const updateUser = (newUserData) => {
+    localStorage.setItem("user", JSON.stringify(newUserData));
+    setUser(newUserData);
+  };
+
+  // ดึงจำนวนแจ้งเตือนที่ยังไม่อ่าน
+  const fetchUnreadNotiCount = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return setUnreadNotiCount(0);
+
+      const res = await axios.get("http://localhost:5000/api/notifications/unread-count", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setUnreadNotiCount(res.data?.count ?? 0);
+    } catch {
+      // ถ้า error ก็ไม่ต้องทำอะไรเยอะ กัน UI กระพริบ
+      setUnreadNotiCount((c) => c || 0);
     }
+  };
 
-    // ฟังก์ชันสำหรับอัปเดต user state และ localStorage พร้อมกัน
-    const updateUser = (newUserData) => {
-        localStorage.setItem("user", JSON.stringify(newUserData));
-        setUser(newUserData);
-    };
+  // เมื่อ user login แล้ว ให้ polling เบา ๆ ทุก 15 วิ เพื่ออัปเดต badge
+  useEffect(() => {
+    if (!user) return;
+    fetchUnreadNotiCount();
 
-    // ส่งค่า user และฟังก์ชันต่างๆ ผ่าน Provider
-    return (
-        <AuthContext.Provider value={{ user, login, logout, updateUser }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    const t = setInterval(() => {
+      fetchUnreadNotiCount();
+    }, 15000);
+
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        updateUser,
+
+        // noti
+        unreadNotiCount,
+        fetchUnreadNotiCount,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
-// 3. สร้าง Custom Hook เพื่อง่ายต่อการเรียกใช้ Context
-export const useAuth = () => {
-    return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);

@@ -38,7 +38,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const quizRoutes = require("./routes/quizRoutes");
 const certificateRoutes = require("./routes/certificateRoutes");
-
+const notificationRoutes = require("./routes/notificationRoutes");
 
 app.use("/api/courses", courseRoutes);
 app.use("/api/orders", orderRoutes);
@@ -47,6 +47,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/certificates", certificateRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // health check ง่าย ๆ
 app.get("/health", (req, res) => res.json({ ok: true }));
