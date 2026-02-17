@@ -28,6 +28,19 @@ router.get("/unread-count", verifyToken, async (req, res) => {
   }
 });
 
+// PATCH /api/notifications/read-all -> อ่านแล้วทั้งหมด
+router.patch("/read-all", verifyToken, async (req, res) => {
+  try {
+    await Notification.updateMany(
+      { userId: req.user.id, isRead: false },
+      { isRead: true }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // PATCH /api/notifications/:id/read -> ทำเป็นอ่านแล้ว 1 อัน
 router.patch("/:id/read", verifyToken, async (req, res) => {
   try {
@@ -38,19 +51,6 @@ router.patch("/:id/read", verifyToken, async (req, res) => {
     );
     if (!noti) return res.status(404).json({ message: "ไม่พบแจ้งเตือน" });
     res.json(noti);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// PATCH /api/notifications/read-all -> อ่านแล้วทั้งหมด
-router.patch("/read-all", verifyToken, async (req, res) => {
-  try {
-    await Notification.updateMany(
-      { userId: req.user.id, isRead: false },
-      { isRead: true }
-    );
-    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

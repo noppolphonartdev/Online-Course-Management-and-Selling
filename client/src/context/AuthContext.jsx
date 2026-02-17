@@ -1,10 +1,9 @@
 import React, { createContext, useEffect, useState, useContext } from "react";
 import axios from "axios";
 
-// 1) สร้าง Context object
 const AuthContext = createContext(null);
 
-// Utility: อ่าน user จาก localStorage
+// Utility function สำหรับอ่านข้อมูลจาก localStorage
 const getUserFromLocalStorage = () => {
   try {
     return JSON.parse(localStorage.getItem("user")) || null;
@@ -16,7 +15,7 @@ const getUserFromLocalStorage = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => getUserFromLocalStorage());
 
-  // แจ้งเตือน: จำนวน unread เพื่อโชว์ที่ Navbar
+  // จำนวนแจ้งเตือนที่ยังไม่อ่าน (โชว์บน bell)
   const [unreadNotiCount, setUnreadNotiCount] = useState(0);
 
   const login = (loginResponseData) => {
@@ -37,28 +36,31 @@ export const AuthProvider = ({ children }) => {
     setUser(newUserData);
   };
 
-  // ดึงจำนวนแจ้งเตือนที่ยังไม่อ่าน
+  // ดึง unread-count จาก backend เพื่อให้ badge อัปเดต/หาย
   const fetchUnreadNotiCount = async () => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) return setUnreadNotiCount(0);
+      if (!token) {
+        setUnreadNotiCount(0);
+        return;
+      }
 
       const res = await axios.get("http://localhost:5000/api/notifications/unread-count", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       setUnreadNotiCount(res.data?.count ?? 0);
-    } catch {
-      // ถ้า error ก็ไม่ต้องทำอะไรเยอะ กัน UI กระพริบ
-      setUnreadNotiCount((c) => c || 0);
+    } catch (err) {
+      // ไม่ต้อง alert กัน UX พัง แค่ log พอ
+      console.error("fetchUnreadNotiCount error:", err);
     }
   };
 
-  // เมื่อ user login แล้ว ให้ polling เบา ๆ ทุก 15 วิ เพื่ออัปเดต badge
+  // ตอน user login แล้ว ให้โหลด count ทันที + polling เบาๆ กันค้าง
   useEffect(() => {
     if (!user) return;
-    fetchUnreadNotiCount();
 
+    fetchUnreadNotiCount();
     const t = setInterval(() => {
       fetchUnreadNotiCount();
     }, 15000);

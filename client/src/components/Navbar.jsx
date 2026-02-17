@@ -1,18 +1,22 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import UserProfileDropdown from "./UserProfileDropdown";
+import NotificationsDropdown from "./NotificationsDropdown";
 import { useAuth } from "../context/AuthContext";
-import { FaBars, FaTimes, FaRegBell  } from "react-icons/fa";
+import { FaBars, FaTimes, FaRegBell } from "react-icons/fa";
 
 function Navbar() {
-  // ดึง unreadNotiCount มาด้วย
-  const { user, unreadNotiCount } = useAuth();
+  const { user, unreadNotiCount, fetchUnreadNotiCount } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const navigate = useNavigate();
 
-  const goToNotifications = () => {
-    // ถ้ายังไม่มีหน้ารวมแจ้งเตือน แนะนำใช้ /my-orders ก่อน
-    navigate("/notifications"); // หรือ "/my-orders"
+  // ✅ เปิด/ปิด dropdown แจ้งเตือน
+  const [notiOpen, setNotiOpen] = useState(false);
+
+  const toggleNoti = async () => {
+    // เวลาเปิด dropdown ให้ดึง count ล่าสุดนิดนึง (กันค้าง)
+    await fetchUnreadNotiCount?.();
+    setNotiOpen((v) => !v);
+    // ปิดเมนูมือถือถ้าเปิดอยู่ (กันซ้อน UI)
     setIsOpen(false);
   };
 
@@ -52,12 +56,12 @@ function Navbar() {
         </div>
 
         {/* ส่วน User/Login (Desktop) */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-3 relative">
           {user ? (
             <>
-              {/* กระดิ่งแจ้งเตือน */}
+              {/* กระดิ่งแจ้งเตือน + dropdown */}
               <button
-                onClick={goToNotifications}
+                onClick={toggleNoti}
                 className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-gray-100 transition"
                 aria-label="Notifications"
                 title="แจ้งเตือน"
@@ -69,6 +73,12 @@ function Navbar() {
                   </span>
                 )}
               </button>
+
+              {/* Dropdown แจ้งเตือน */}
+              <NotificationsDropdown
+                open={notiOpen}
+                onClose={() => setNotiOpen(false)}
+              />
 
               <UserProfileDropdown />
             </>
@@ -88,26 +98,36 @@ function Navbar() {
         </div>
 
         {/* ปุ่ม Hamburger (Mobile) */}
-        <div className="md:hidden flex items-center gap-2">
-          {/* ถ้า login แล้ว โชว์กระดิ่งบนมือถือด้วย */}
+        <div className="md:hidden flex items-center gap-2 relative">
+          {/* ถ้า login แล้ว โชว์กระดิ่งบนมือถือ + dropdown */}
           {user && (
-            <button
-              onClick={goToNotifications}
-              className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-gray-100 transition"
-              aria-label="Notifications"
-              title="แจ้งเตือน"
-            >
-              <FaRegBell size={22} className="text-gray-700" />
-              {unreadNotiCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[11px] grid place-items-center">
-                  {unreadNotiCount}
-                </span>
-              )}
-            </button>
+            <>
+              <button
+                onClick={toggleNoti}
+                className="relative h-10 w-10 grid place-items-center rounded-full hover:bg-gray-100 transition"
+                aria-label="Notifications"
+                title="แจ้งเตือน"
+              >
+                <FaRegBell size={22} className="text-gray-700" />
+                {unreadNotiCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[11px] grid place-items-center">
+                    {unreadNotiCount}
+                  </span>
+                )}
+              </button>
+
+              <NotificationsDropdown
+                open={notiOpen}
+                onClose={() => setNotiOpen(false)}
+              />
+            </>
           )}
 
           <button
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => {
+              setIsOpen(!isOpen);
+              setNotiOpen(false); // กันซ้อนกับ dropdown
+            }}
             className="text-gray-700 focus:outline-none"
             aria-label="Menu"
           >
@@ -160,7 +180,7 @@ function Navbar() {
           {user && (
             <li>
               <button
-                onClick={goToNotifications}
+                onClick={toggleNoti}
                 className="text-gray-700 hover:text-blue-500 flex items-center gap-2"
               >
                 แจ้งเตือน

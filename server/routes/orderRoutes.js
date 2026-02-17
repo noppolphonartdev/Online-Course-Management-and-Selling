@@ -127,7 +127,7 @@ router.patch("/:id/update-status", verifyToken, isAdmin, async (req, res) => {
     orderBefore.paymentStatus = status;
     await orderBefore.save();
 
-    // ✅ ถ้าเปลี่ยนจากไม่ใช่ paid -> เป็น paid => แจ้งเตือน + ส่งเมล
+    // ถ้าเปลี่ยนจากไม่ใช่ paid -> เป็น paid => แจ้งเตือน + ส่งเมล
     if (prevStatus !== "paid" && status === "paid") {
       const courseTitle = orderBefore.courseId?.title || "คอร์สของคุณ";
       const email = orderBefore.userId?.email || orderBefore.customerEmail;
@@ -138,9 +138,10 @@ router.patch("/:id/update-status", verifyToken, isAdmin, async (req, res) => {
         type: "order",
         title: "อนุมัติการชำระเงินสำเร็จ ✅",
         message: `คำสั่งซื้อ "${courseTitle}" ได้รับการอนุมัติแล้ว คุณสามารถเข้าเรียนได้ทันที`,
-        link: "/my-orders",
+        link: `/course/${orderBefore.courseId?._id}`,
         isRead: false,
       });
+
 
       // 2) ส่งเมล
       const appUrl = process.env.APP_URL || "http://localhost:5173";
